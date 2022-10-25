@@ -11,9 +11,11 @@ namespace WebView2Unity
         public Button ButtonRef;
         public Text ButtonTextRef;
 
+
         // Start is called before the first frame update
         void Start()
         {
+            WebView2Native.RegisterDebugCallback();
             ButtonRef.onClick.AddListener(OnPressButton);
         }
 
@@ -67,7 +69,7 @@ namespace WebView2Unity
 
         private void OnPressOpenButton()
         {
-            WebView2Native.Create("https://google.co.jp");
+            WebView2Native.Create("https://google.com");
             WebView2Native.UpdateBound(UIHelper.GetCanvasRectangle(ImageRef.rectTransform));
 
             ButtonTextRef.text = "Close";
