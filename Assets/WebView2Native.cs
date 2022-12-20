@@ -11,17 +11,19 @@ namespace WebView2Unity
     {
         private const string PLUGIN = "WebView2Plugin";
         [DllImport(PLUGIN, CharSet = CharSet.Unicode)]
-        private static extern void createWebView(string url, string browserPath = null, string dataPath = null);
+        private static extern void createWebView(string objectName, string url, string browserPath = null, string dataPath = null, string windowName = null);
         [DllImport(PLUGIN, CharSet = CharSet.Unicode)]
-        private static extern void navigate(string url);
+        private static extern void navigate(string objectName, string url);
         [DllImport(PLUGIN, CharSet = CharSet.Unicode)]
-        private static extern void navigateToHTML(string htmlContent);
+        private static extern void navigateToHTML(string objectName, string htmlContent);
         [DllImport(PLUGIN)]
-        private static extern void updateWebViewBound(int x, int y, int width, int height);
+        private static extern void updateWebViewBound(string objectName, int x, int y, int width, int height);
         [DllImport(PLUGIN)]
-        private static extern void closeWebView();
+        private static extern void closeWebView(string objectName);
         [DllImport(PLUGIN)]
-        private static extern bool isActive();
+        private static extern bool isActive(string objectName);
+        [DllImport(PLUGIN)]
+        private static extern bool isVisible(string objectName);
 
         [DllImport(PLUGIN)]
         static extern void RegisterDebugCallback(debugCallback cb);
@@ -33,11 +35,12 @@ namespace WebView2Unity
         {
             RegisterDebugCallback(OnDebugCallback);
         }
+
         [MonoPInvokeCallback(typeof(debugCallback))]
         static void OnDebugCallback(IntPtr request, int color, int size)
         {
             //Ptr to string
-            string debug_string = Marshal.PtrToStringAnsi(request, size);
+            string debug_string = Marshal.PtrToStringUni(request, size);
 
             //Add Specified Color
             debug_string =
@@ -52,39 +55,55 @@ namespace WebView2Unity
             UnityEngine.Debug.Log(debug_string);
         }
 
-        public static void Create(string url, string browserPath = null, string dataPath = null)
+
+        [DllImport(PLUGIN, CharSet = CharSet.Unicode)]
+        static extern void RegisterNavigationCompletedCallback(string objectName, EventCallBack cb);
+        //Create string param callback delegate
+        public delegate void EventCallBack(IntPtr request, int size);
+
+        public static void RegisterNavigationCompletedCB(string objectName, EventCallBack cb)
         {
-            createWebView(url, browserPath, dataPath);
+            RegisterNavigationCompletedCallback(objectName, cb);
         }
 
-        public static void Navigate(string url)
+        public static void Create(string objectName, string url, string browserPath = null, string dataPath = null, string windowName = null)
         {
-            navigate(url);
+            createWebView(objectName, url, browserPath, dataPath, windowName);
         }
 
-        public static void NavigateToHTML(string htmlContent)
+        public static void Navigate(string objectName, string url)
         {
-            navigateToHTML(htmlContent);
+            navigate(objectName, url);
         }
 
-        public static void UpdateBound(int x, int y, int width, int height)
+        public static void NavigateToHTML(string objectName, string htmlContent)
         {
-            updateWebViewBound(x, y, width, height);
+            navigateToHTML(objectName, htmlContent);
         }
 
-        public static void UpdateBound(Rect rect)
+        public static void UpdateBound(string objectName, int x, int y, int width, int height)
         {
-            UpdateBound((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
+            updateWebViewBound(objectName, x, y, width, height);
         }
 
-        public static void Close()
+        public static void UpdateBound(string objectName, Rect rect)
         {
-            closeWebView();
+            UpdateBound(objectName, (int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
         }
 
-        public static bool IsActive()
+        public static void Close(string objectName)
         {
-            return isActive();
+            closeWebView(objectName);
+        }
+
+        public static bool IsActive(string objectName)
+        {
+            return isActive(objectName);
+        }
+
+        public static bool IsVisible(string objectName)
+        {
+            return isVisible(objectName);
         }
     }
 
@@ -94,6 +113,9 @@ namespace WebView2Unity
         {
             Vector3[] corners = new Vector3[4];
             rectTransform.GetWorldCorners(corners);
+
+            #if UNITY_EDITOR
+            #endif
 
             return new Rect(
                 corners[1].x, Screen.height - corners[1].y,
