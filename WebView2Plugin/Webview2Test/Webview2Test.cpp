@@ -111,8 +111,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
-
-   createWebView()
+   
+   createWebView(L"Test", "http://numac.fr");
 
    return TRUE;
 }

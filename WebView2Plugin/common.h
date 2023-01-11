@@ -4,6 +4,8 @@
 #include <Windows.h>
 #include <string>
 #include <tchar.h>
+#include <iostream>
+#include <fstream>
 
 // DEBUG LOG by
 // https://github.com/programmercert/UnityNativeDebugLog

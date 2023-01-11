@@ -16,10 +16,10 @@ static std::map<LPCWSTR, MyWebview*>::iterator webviewsIt;
 MyWebview* getWebView(LPCWSTR objectName) {
     if (webviews.size() > 0)
     {
-        webviewsIt = webviews.find(objectName);
-        if (webviewsIt != webviews.end())
+        for (std::map<LPCWSTR, MyWebview*>::iterator it = webviews.begin(); it != webviews.end(); ++it)
         {
-            return webviewsIt->second;
+            if (wcscmp(objectName, it->first) == 0)
+                return it->second;
         }
     }
     return NULL;
@@ -29,6 +29,17 @@ MyWebview* getWebView(LPCWSTR objectName) {
 void Log(LPCWSTR message, Color color) {
     if (dbgCallbackInstance != nullptr)
         dbgCallbackInstance(message, (int)color, (int)wcslen(message));
+}
+void Log(LPCWSTR message, Color color, ...) {
+    va_list vl; 
+    va_start(vl, message);
+    if (dbgCallbackInstance != nullptr)
+    {
+        wchar_t szBuff[1024];
+        swprintf_s(szBuff, 1024, message, vl);
+        dbgCallbackInstance(szBuff, (int)color, (int)wcslen(szBuff));
+    }
+    va_end(vl);
 }
 //-------------------------------------------------------------------
 
@@ -45,12 +56,39 @@ void RegisterNavigationCompletedCallback(LPCWSTR objectName, EventCallBack cb)
 }
 //-------------------------------------------------------------------
 
-PLUGIN_API void createWebView(LPCWSTR objectName, LPCWSTR url, LPCWSTR browserPath = NULL, LPCWSTR dataPath = NULL, LPCWSTR windowName = NULL) {
+PLUGIN_API int newWebView(LPCWSTR objectName, EventCallBack cb = nullptr) {
     if (getWebView(objectName) == NULL)
     {
-        MyWebview* webview = new MyWebview(objectName, url, browserPath, dataPath, windowName);
-        webviews[objectName] = webview;
+        Log(L"create new webview named : ");
+        Log(objectName);
+        webviews[objectName] = new MyWebview(objectName, cb);
+        //webviews.insert(std::pair<LPCWSTR, MyWebview*>(objectName, webview));
+
+        return 0;
     }
+    else {
+        Log(L"webview already created");
+    }
+    return -1;
+}
+
+PLUGIN_API int createWebView(LPCWSTR objectName, LPCWSTR url, bool startVisible = true, LPCWSTR browserPath = nullptr, LPCWSTR dataPath = nullptr, LPCWSTR windowName = nullptr) {
+    MyWebview* webView = getWebView(objectName);
+    if (webView != NULL) {
+        return webView->create(url, startVisible, browserPath, dataPath, windowName);
+    }
+    else
+    {
+        int nbWebview = (int)webviews.size();
+        wchar_t szbuf[256];
+        swprintf_s(szbuf, 256, L"Webview not available over %d : ", nbWebview);
+        Log(szbuf);
+        for (std::map<LPCWSTR, MyWebview*>::iterator it = webviews.begin(); it != webviews.end(); ++it)
+        {
+            Log(it->first);
+        }
+    }
+    return -1;
 }
 
 PLUGIN_API void navigate(LPCWSTR objectName, LPCWSTR url) {
@@ -103,4 +141,33 @@ PLUGIN_API bool isVisible(LPCWSTR objectName) {
         return webView->isVisible();
     }
     return false;
+}
+
+PLUGIN_API void setVisibility(LPCWSTR objectName, bool visibility) {
+    MyWebview* webView = getWebView(objectName);
+    if (webView != NULL) {
+        webView->setVisibility(visibility);
+    }
+}
+
+PLUGIN_API void RunJavaScript(LPCWSTR objectName, LPCWSTR script, JSCallBack callback)
+{
+    MyWebview* webView = getWebView(objectName);
+    if (webView != NULL) {
+        webView->runJavascript(script, callback);
+    }
+}
+
+PLUGIN_API void getCookies(LPCWSTR objectName, LPCWSTR url, EventCallBack callback) {
+    MyWebview* webView = getWebView(objectName);
+    if (webView != NULL) {
+        webView->getCookies(url, callback);
+    }
+}
+
+PLUGIN_API bool saveCookies(LPCWSTR objectName, LPCWSTR url) {
+    MyWebview* webView = getWebView(objectName);
+    if (webView != NULL) {
+        return webView->saveCookies(url);
+    }
 }
