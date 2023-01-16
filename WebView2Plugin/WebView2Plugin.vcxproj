@@ -172,6 +172,7 @@ xcopy /Y $(TargetDir)WebView2Loader.dll $(SolutionDir)..\Assets\Plugins\</Comman
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="jsoncpp.cpp" />
     <ClCompile Include="MyWebview.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -179,6 +180,8 @@ xcopy /Y $(TargetDir)WebView2Loader.dll $(SolutionDir)..\Assets\Plugins\</Comman
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common.h" />
+    <ClInclude Include="json\json-forwards.h" />
+    <ClInclude Include="json\json.h" />
     <ClInclude Include="MyWebview.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

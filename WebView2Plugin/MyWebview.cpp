@@ -3,6 +3,9 @@
 #include <wrl.h>
 #include <WebView2EnvironmentOptions.h>
 #include <regex>
+#include "json/json.h"
+#include <locale>
+#include <codecvt>
 
 using namespace Microsoft::WRL;
 
@@ -35,11 +38,11 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
 
     userDataPath = dataPath;
     cookiesDataPath = userDataPath;
-    if (!userDataPath.empty())
+    /*if (!userDataPath.empty())
     {
         std::wstring web = L"\\web";
         cookiesDataPath = userDataPath.replace(userDataPath.find(web), web.size(), L"\\");
-    }
+    }*/
 
     auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
     options->put_AllowSingleSignOnUsingOSPrimaryAccount(TRUE);
@@ -61,6 +64,11 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
                         auto webview2_2 = webviewWindow.try_query<ICoreWebView2_2>();
                         if (webview2_2 != nullptr)
                             webview2_2->get_CookieManager(&cookieManager);
+
+                        if (cookieManager != nullptr)
+                        {
+                            loadCookies();
+                        }
                         //! [CookieManager]
 
                         // WebViewの設定
@@ -236,8 +244,8 @@ bool MyWebview::saveCookies(LPCWSTR url)
                 [this](HRESULT error_code, ICoreWebView2CookieList* list) -> HRESULT {
             std::wstring cookies = cookieListToString(list);
 
-            std::ofstream cookieFile;
-            cookieFile.open(cookiesDataPath + L"cookies.dat", std::ios::trunc || std::ios::out);
+            std::wofstream cookieFile;
+            cookieFile.open(cookiesDataPath + L"\\cookies.dat", std::ios::out | std::ios::in | std::ios::trunc);
             cookieFile << cookies.c_str();
             cookieFile.close();
 
@@ -265,7 +273,7 @@ std::wstring MyWebview::cookieListToString(ICoreWebView2CookieList* list)
     list->get_Count(&cookie_list_size);
     if (cookie_list_size != 0)
     {
-        //cookies += L"[";
+        cookies += L"[";
         for (UINT i = 0; i < cookie_list_size; ++i)
         {
             wil::com_ptr<ICoreWebView2Cookie> cookie;
@@ -339,4 +347,57 @@ std::wstring MyWebview::cookieToString(ICoreWebView2Cookie* cookie)
 
     return result + L"\"}";
     //! [CookieObject]
+}
+
+void MyWebview::loadCookies()
+{
+    std::ifstream f(cookiesDataPath);
+
+    Json::Value data;
+    Json::Reader reader;
+    std::ifstream cookieFile(cookiesDataPath + L"\\cookies.dat", std::ifstream::in);
+    reader.parse(cookieFile, data);
+
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+
+    if (data.isArray())
+    {
+        //! [CookieObject]
+        for (auto it = data.begin(); it != data.end(); ++it)
+        {
+            auto jsonNode = (*it);
+            std::string name = jsonNode.get("Name", "").asString().c_str();
+            std::string value = jsonNode.get("Value", "").asString().c_str();
+            std::string domain = jsonNode.get("Domain", "").asString().c_str();
+            std::string path = jsonNode.get("Path", "").asString().c_str();
+
+
+            std::wstring wideName = converter.from_bytes(name);
+            std::wstring wideValue = converter.from_bytes(value);
+            std::wstring wideDomain = converter.from_bytes(domain);
+            std::wstring widePath = converter.from_bytes(path);
+
+            wil::com_ptr<ICoreWebView2Cookie> cookie;
+            cookieManager->CreateCookie(wideName.c_str(), wideValue.c_str(), wideDomain.c_str(), widePath.c_str(), &cookie);
+            cookieManager->AddOrUpdateCookie(cookie.get());
+        }
+        //! [CookieList]
+    }
+    else if (data.isObject())
+    {
+        Json::String name = data.get("Name", "").asString();
+        Json::String value = data.get("Value", "").asString();
+        Json::String domain = data.get("Domain", "").asString();
+        Json::String path = data.get("Path", "").asString();
+
+        std::wstring wideName = converter.from_bytes(name);
+        std::wstring wideValue = converter.from_bytes(value);
+        std::wstring wideDomain = converter.from_bytes(domain);
+        std::wstring widePath = converter.from_bytes(path);
+
+        wil::com_ptr<ICoreWebView2Cookie> cookie;
+        cookieManager->CreateCookie(wideName.c_str(), wideValue.c_str(), wideDomain.c_str(), widePath.c_str(), &cookie);
+        cookieManager->AddOrUpdateCookie(cookie.get());
+
+    }
 }

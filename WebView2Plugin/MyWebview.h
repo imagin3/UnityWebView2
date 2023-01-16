@@ -142,4 +142,11 @@ private:
     /// <param name="cookie">webview2 cookie to convert</param>
     /// <returns>json representation of webview2 cookie as string</returns>
     std::wstring cookieToString(ICoreWebView2Cookie* cookie);
+
+    /// <summary>
+    /// Converts back webview from string
+    /// </summary>
+    /// <param name="json">json string to convert to cookie object</param>
+    /// <returns>parsed cookie</returns>
+    void loadCookies();
 };

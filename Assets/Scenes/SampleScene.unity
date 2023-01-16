@@ -588,11 +588,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 963194225}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: caecd6651cca3924c833ea70bab8b6de, type: 3}
+  m_Script: {fileID: 11500000, guid: a00f3ce3c67650343966c503b3d35738, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ImageRef: {fileID: 1959111597}
-  InitialURL: http://samlidp.iteca.lan/?returnto=http://iteca.lan
+  debug: 0
+  ImageRef: {fileID: 0}
+  InitialURL: 
   showWebview: 1
 --- !u!114 &963194230
 MonoBehaviour:
@@ -603,7 +604,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 963194225}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 720050081dccccf49b94bf8c455a7050, type: 3}
+  m_Script: {fileID: 11500000, guid: 0c808e9ef7a47864b8dd157834829814, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!1 &1515259446

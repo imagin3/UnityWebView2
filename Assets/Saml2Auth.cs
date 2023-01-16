@@ -9,7 +9,7 @@ namespace WebView2Unity
     public class Saml2Auth : MonoBehaviour
     {
         WebView2Unity webview;
-        string targetUrl = "http://iteca.lan";
+        string targetUrl = "http://samlidp.iteca.lan/userinfos.php";
         string authUrl = "http://samlidp.iteca.lan/";
 
         // Start is called before the first frame update
@@ -17,7 +17,9 @@ namespace WebView2Unity
         {
             if (webview == null)
                 webview = GetComponent<WebView2Unity>();
-            
+
+            webview.InitialURL = authUrl + "?returnto=" + targetUrl;
+
             webview.OnPageLoaded += OnPageLoaded;
             //webview.OnGetCookies += OnGetCookies;
         }
