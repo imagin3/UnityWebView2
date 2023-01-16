@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -12,6 +13,9 @@ namespace WebView2Unity
         string targetUrl = "http://samlidp.iteca.lan/userinfos.php";
         string authUrl = "http://samlidp.iteca.lan/";
 
+
+        Action<bool> userAuth;
+
         // Start is called before the first frame update
         void Awake()
         {
@@ -20,8 +24,15 @@ namespace WebView2Unity
 
             webview.InitialURL = authUrl + "?returnto=" + targetUrl;
 
-            webview.OnPageLoaded += OnPageLoaded;
-            //webview.OnGetCookies += OnGetCookies;
+            //webview.OnPageLoaded += OnPageLoaded;
+            webview.OnResponseReceived += OnResponseReceived;
+        }
+
+        private void OnResponseReceived(string obj)
+        {
+
+            //if (userAuth != null)
+            //    userAuth(obj);
         }
 
         // Update is called once per frame
@@ -33,9 +44,5 @@ namespace WebView2Unity
                 webview.SaveCookies(url);
             }
         }
-
-        //void OnGetCookies(string jsonCookies)
-        //{
-        //}
     }
 }

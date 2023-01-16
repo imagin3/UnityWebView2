@@ -6,14 +6,16 @@
 #include "json/json.h"
 #include <locale>
 #include <codecvt>
+#include <iterator>
 
 using namespace Microsoft::WRL;
 
-MyWebview::MyWebview(LPCWSTR name, EventCallBack navigationEvent)
+MyWebview::MyWebview(LPCWSTR name, EventCallBack navigationEvent, EventCallBack responseReceivedEvent)
 {
     objectName = name;
     
     registerNavCallback(navigationEvent);
+    registerResponseReceivedCallback(responseReceivedEvent);
 }
 
 int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWSTR dataPath, LPCWSTR windowName) {
@@ -77,6 +79,36 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
                         Settings->put_IsScriptEnabled(TRUE);
                         Settings->put_AreDefaultScriptDialogsEnabled(TRUE);
                         Settings->put_IsWebMessageEnabled(TRUE);
+                        
+                        webview2_2->add_WebResourceResponseReceived(Callback<ICoreWebView2WebResourceResponseReceivedEventHandler>(
+                            [this](
+                                ICoreWebView2*,
+                                ICoreWebView2WebResourceResponseReceivedEventArgs* args) -> HRESULT 
+                            {
+
+                                wil::com_ptr<ICoreWebView2WebResourceResponseView> responseArgs;
+                                args->get_Response(&responseArgs);
+
+                                if (receiveResponseCallbackInstance != nullptr && responseArgs != nullptr)
+                                {
+                                    responseArgs->GetContent(Callback <ICoreWebView2WebResourceResponseViewGetContentCompletedHandler>(
+                                        [this, responseArgs](
+                                            HRESULT errorCode, 
+                                            IStream* content) -> HRESULT 
+                                        {
+                                            
+                                            std::wstring response = objectName + L"@" + responseToJsonString(responseArgs.get(), content);
+
+                                            receiveResponseCallbackInstance(response.c_str(), (int)response.size());
+
+                                            return S_OK;
+                                        }).Get());
+                                }
+
+                                return S_OK;
+
+                            }).Get(), &webResponseReceivedCallbackToken);
+                        
 
                         webviewWindow->add_NavigationCompleted(Callback<ICoreWebView2NavigationCompletedEventHandler>(
                         [this](
@@ -92,6 +124,7 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
                                 {
                                     uri = wil::make_cotaskmem_string(L"");
                                 }
+
                                 /*wchar_t szBuff[512];
                                 swprintf_s(szBuff, 512, L"%s@%s", objectName, uri.get());*/
                                 std::wstring message = objectName + L"@" + uri.get();
@@ -201,6 +234,11 @@ void MyWebview::registerNavCallback(EventCallBack cb)
     navigationCompletedCallbackInstance = cb;
 }
 
+void MyWebview::registerResponseReceivedCallback(EventCallBack cb)
+{
+    receiveResponseCallbackInstance = cb;
+}
+
 void MyWebview::runJavascript(LPCWSTR js, JSCallBack cb) {
     if (webviewWindow != nullptr)
     {
@@ -273,7 +311,7 @@ std::wstring MyWebview::cookieListToString(ICoreWebView2CookieList* list)
     list->get_Count(&cookie_list_size);
     if (cookie_list_size != 0)
     {
-        cookies += L"[";
+        cookies += L"\"cookies\": [\n";
         for (UINT i = 0; i < cookie_list_size; ++i)
         {
             wil::com_ptr<ICoreWebView2Cookie> cookie;
@@ -338,7 +376,7 @@ std::wstring MyWebview::cookieToString(ICoreWebView2Cookie* cookie)
         L"\"SameSite\": " + encodeQuote(same_site_as_string) + L", " + L"\"Expires\": ";
     if (!!isSession)
     {
-        result += L"This is a session cookie.";
+        result += L"\"This is a session cookie.\"";
     }
     else
     {
@@ -349,28 +387,36 @@ std::wstring MyWebview::cookieToString(ICoreWebView2Cookie* cookie)
     //! [CookieObject]
 }
 
-void MyWebview::loadCookies()
+bool MyWebview::loadCookies()
 {
     std::ifstream f(cookiesDataPath);
 
-    Json::Value data;
+    Json::Value root;
     Json::Reader reader;
     std::ifstream cookieFile(cookiesDataPath + L"\\cookies.dat", std::ifstream::in);
-    reader.parse(cookieFile, data);
+    reader.parse(cookieFile, root);
+
+    Json::Value cookies = root["cookies"];
 
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 
-    if (data.isArray())
+    if (cookies.isArray())
     {
-        //! [CookieObject]
-        for (auto it = data.begin(); it != data.end(); ++it)
+        bool oneLoaded = false;
+        //! [CookieList]
+        for (auto it = cookies.begin(); it != cookies.end(); ++it)
         {
             auto jsonNode = (*it);
-            std::string name = jsonNode.get("Name", "").asString().c_str();
-            std::string value = jsonNode.get("Value", "").asString().c_str();
-            std::string domain = jsonNode.get("Domain", "").asString().c_str();
-            std::string path = jsonNode.get("Path", "").asString().c_str();
+            std::string name = jsonNode["Name"].asString().c_str();
+            std::string value = jsonNode["Value"].asString().c_str();
+            std::string domain = jsonNode["Domain"].asString().c_str();
+            std::string path = jsonNode["Path"].asString().c_str();
 
+            // unable to parse this cookie, don't load it
+            if (name == "" || value == "")
+            {
+                continue;
+            }
 
             std::wstring wideName = converter.from_bytes(name);
             std::wstring wideValue = converter.from_bytes(value);
@@ -380,24 +426,110 @@ void MyWebview::loadCookies()
             wil::com_ptr<ICoreWebView2Cookie> cookie;
             cookieManager->CreateCookie(wideName.c_str(), wideValue.c_str(), wideDomain.c_str(), widePath.c_str(), &cookie);
             cookieManager->AddOrUpdateCookie(cookie.get());
+            
+            oneLoaded = true;
         }
         //! [CookieList]
+        return oneLoaded;
     }
-    else if (data.isObject())
+    return false;
+}
+
+std::wstring MyWebview::responseToJsonString(
+    ICoreWebView2WebResourceResponseView* response, IStream* content)
+{
+    wil::com_ptr<ICoreWebView2HttpResponseHeaders> headers;
+    response->get_Headers(&headers);
+    int statusCode;
+    response->get_StatusCode(&statusCode);
+    wil::unique_cotaskmem_string reasonPhrase;
+    response->get_ReasonPhrase(&reasonPhrase);
+    BOOL containsContentType = FALSE;
+    headers->Contains(L"Content-Type", &containsContentType);
+    wil::unique_cotaskmem_string contentType;
+    bool isBinaryContent = true;
+    if (containsContentType)
     {
-        Json::String name = data.get("Name", "").asString();
-        Json::String value = data.get("Value", "").asString();
-        Json::String domain = data.get("Domain", "").asString();
-        Json::String path = data.get("Path", "").asString();
-
-        std::wstring wideName = converter.from_bytes(name);
-        std::wstring wideValue = converter.from_bytes(value);
-        std::wstring wideDomain = converter.from_bytes(domain);
-        std::wstring widePath = converter.from_bytes(path);
-
-        wil::com_ptr<ICoreWebView2Cookie> cookie;
-        cookieManager->CreateCookie(wideName.c_str(), wideValue.c_str(), wideDomain.c_str(), widePath.c_str(), &cookie);
-        cookieManager->AddOrUpdateCookie(cookie.get());
-
+        headers->GetHeader(L"Content-Type", &contentType);
+        if (wcsncmp(L"text/", contentType.get(), ARRAYSIZE(L"text/")) == 0)
+        {
+            isBinaryContent = false;
+        }
     }
+    std::wstring result = L"{";
+
+    result += L"\"content\": ";
+    if (!content)
+    {
+        result += L"null";
+    }
+    else
+    {
+        if (isBinaryContent)
+        {
+            result += encodeQuote(L"BINARY_DATA");
+        }
+        else
+        {
+            bool readAll = false;
+            // TODO : parse all data
+            result += encodeQuote(getResponseContent(content, readAll));
+            if (!readAll)
+            {
+                result += L"...";
+            }
+        }
+    }
+    result += L", ";
+
+    result += L"\"headers\": " + responseHeadersToJsonString(headers.get()) + L", ";
+    result += L"\"status\": ";
+    WCHAR statusCodeString[4];
+    _itow_s(statusCode, statusCodeString, 4, 10);
+    result += statusCodeString;
+    result += L", ";
+    result += L"\"reason\": " + encodeQuote(reasonPhrase.get()) + L" ";
+
+    result += L"}";
+
+    return result;
+}
+
+
+std::wstring MyWebview::getResponseContent(IStream* content, bool& readAll)
+{
+    char buffer[50];
+    unsigned long read;
+    content->Read(buffer, 50U, &read);
+    readAll = read < 50;
+
+    WCHAR converted[50];
+    MultiByteToWideChar(CP_UTF8, MB_PRECOMPOSED, buffer, 50, converted, 50);
+    return std::wstring(converted);
+}
+
+std::wstring MyWebview::responseHeadersToJsonString(ICoreWebView2HttpResponseHeaders* responseHeaders)
+{
+    wil::com_ptr<ICoreWebView2HttpHeadersCollectionIterator> iterator;
+    responseHeaders->GetIterator(&iterator);
+    BOOL hasCurrent = FALSE;
+    std::wstring result = L"[";
+
+    while (SUCCEEDED(iterator->get_HasCurrentHeader(&hasCurrent)) && hasCurrent)
+    {
+        wil::unique_cotaskmem_string name;
+        wil::unique_cotaskmem_string value;
+
+        iterator->GetCurrentHeader(&name, &value);
+        result += encodeQuote(std::wstring(name.get()) + L": " + value.get());
+
+        BOOL hasNext = FALSE;
+        iterator->MoveNext(&hasNext);
+        if (hasNext)
+        {
+            result += L", ";
+        }
+    }
+
+    return result + L"]";
 }

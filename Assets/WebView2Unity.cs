@@ -18,6 +18,7 @@ namespace WebView2Unity
         /// Callback Event 
         /// </summary>
         public Action<string> OnPageLoaded;
+        public Action<string> OnResponseReceived;
         public Action<string> OnGetCookies;
 
         /// <summary>
@@ -75,7 +76,7 @@ namespace WebView2Unity
                     else browserPath = browserDir.FullName;
                 }
                 Debug.Log("new webview");
-                WebView2Native.NewWebView(gameObject.name, callbacckNavigationCompleted);
+                WebView2Native.NewWebView(gameObject.name, callbackNavigationCompleted, callbackResponseReceived);
 
                 string url = InitialURL;
                 if (string.IsNullOrEmpty(url))
@@ -90,7 +91,15 @@ namespace WebView2Unity
             }
         }
 
-        private void callbacckNavigationCompleted(string message){
+        private void callbackResponseReceived(string message)
+        {
+            if (OnResponseReceived != null)
+            {
+                OnResponseReceived(message);
+            }
+        }
+
+        private void callbackNavigationCompleted(string message){
             Debug.Log("show : " + gameObject.name + " = " + message);
             //Show();
             if (OnPageLoaded != null)

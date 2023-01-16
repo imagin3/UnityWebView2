@@ -11,7 +11,7 @@ namespace WebView2Unity
     {
         private const string PLUGIN = "WebView2Plugin";
         [DllImport(PLUGIN, CharSet = CharSet.Unicode)]
-        private static extern int newWebView(string objectName, EventCallBack cb = null);
+        private static extern int newWebView(string objectName, EventCallBack navigationCB = null, EventCallBack responseReceivedCB = null);
         [DllImport(PLUGIN, CharSet = CharSet.Unicode)]
         private static extern int createWebView(string objectName, string url, bool startVisible = true, string browserPath = null, string dataPath = null, string windowName = null);
         [DllImport(PLUGIN, CharSet = CharSet.Unicode)]
@@ -70,6 +70,7 @@ namespace WebView2Unity
 
         //static Dictionary<string, Action<string>> navigationCallbacks;
         static Dictionary<string, Action<string>> navigationCallbacks = new Dictionary<string, Action<string>>();
+        static Dictionary<string, Action<string>> responseCallbacks = new Dictionary<string, Action<string>>();
         static Dictionary<string, Action<string>> cookiesCallbacks = new Dictionary<string, Action<string>>();
 
         [MonoPInvokeCallback(typeof(EventCallBack))]
@@ -89,20 +90,38 @@ namespace WebView2Unity
             }
         }
 
+        [MonoPInvokeCallback(typeof(EventCallBack))]
+        public static void OnReponseReceivedCallback(IntPtr message, int size)
+        {
+            if (responseCallbacks != null && responseCallbacks.Count > 0)
+            {
+                string msg_string = Marshal.PtrToStringUni(message, size);
+                string[] splittedMsg = msg_string.Split('@');
+                string objName = splittedMsg[0];
+                string jsonMessage = splittedMsg.Length > 1 ? splittedMsg[1] : "";
+
+                if (responseCallbacks.ContainsKey(objName))
+                    responseCallbacks[objName](jsonMessage);
+            }
+        }
+
         /// <summary>
         /// 
         /// </summary>
         /// <param name="objectName"></param>
-        /// <param name="callback"></param>
+        /// <param name="navigationCb"></param>
+        /// <param name="responseReceivedCb"></param>
         /// <returns> -1 for webview already created</returns>
-        public static int NewWebView(string objectName, Action<string> callback)
+        public static int NewWebView(string objectName, Action<string> navigationCb, Action<string> responseReceivedCb)
         {
             if (!navigationCallbacks.ContainsKey(objectName))
             {
-                navigationCallbacks.Add(objectName, callback);
+                navigationCallbacks.Add(objectName, navigationCb);
                 //RegisterNavigationCompletedCallback(objectName, OnNavigationCompletedCallback);
             }
-            return newWebView(objectName, OnNavigationCompletedCallback);
+            if (!responseCallbacks.ContainsKey(objectName))
+                responseCallbacks.Add(objectName, responseReceivedCb);
+            return newWebView(objectName, OnNavigationCompletedCallback, OnReponseReceivedCallback);
         }
 
         public static int Create(string objectName, string url, bool startVisible = true, string browserPath = null, string dataPath = null, string windowName = null)

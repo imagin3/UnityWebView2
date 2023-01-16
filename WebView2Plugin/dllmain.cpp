@@ -47,21 +47,22 @@ void Log(LPCWSTR message, Color color, ...) {
 /// Register Navigation Completed Callback
 /// </summary>
 /// <param name="cb">function called back</param>
-void RegisterNavigationCompletedCallback(LPCWSTR objectName, EventCallBack cb)
+void RegisterNavigationCompletedCallback(LPCWSTR objectName, EventCallBack navDoneCb, EventCallBack responseReceiveCb)
 {
     MyWebview* webView = getWebView(objectName);
     if (webView != NULL) {
-        webView->registerNavCallback(cb);
+        webView->registerNavCallback(navDoneCb);
+        webView->registerResponseReceivedCallback(responseReceiveCb);
     }
 }
 //-------------------------------------------------------------------
 
-PLUGIN_API int newWebView(LPCWSTR objectName, EventCallBack cb = nullptr) {
+PLUGIN_API int newWebView(LPCWSTR objectName, EventCallBack navCb = nullptr, EventCallBack responseReceivedCb = nullptr) {
     if (getWebView(objectName) == NULL)
     {
         Log(L"create new webview named : ");
         Log(objectName);
-        webviews[objectName] = new MyWebview(objectName, cb);
+        webviews[objectName] = new MyWebview(objectName, navCb, responseReceivedCb);
         //webviews.insert(std::pair<LPCWSTR, MyWebview*>(objectName, webview));
 
         return 0;

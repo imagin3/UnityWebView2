@@ -37,12 +37,14 @@ class MyWebview {
     /* Events */
     EventCallBack navigationCompletedCallbackInstance = nullptr;
     EventRegistrationToken navigationCompletedCallbackToken;
+    EventCallBack receiveResponseCallbackInstance = nullptr;
+    EventRegistrationToken webResponseReceivedCallbackToken;
 
     EventCallBack cookieRetrievedCallbackInstance = nullptr;
 
 
 public:
-    MyWebview(LPCWSTR objectName, EventCallBack navigationEvent);
+    MyWebview(LPCWSTR objectName, EventCallBack navigationEvent, EventCallBack responseReceivedEvent);
 
     /// <summary>
     /// Call webview and environment creation of webview
@@ -121,6 +123,12 @@ public:
     /// <param name="cb"></param>
     void registerNavCallback(EventCallBack cb);
 
+    /// <summary>
+    /// register response received callbakc
+    /// </summary>
+    /// <param name="cb"></param>
+    void registerResponseReceivedCallback(EventCallBack cb);
+
 private:
     ~MyWebview() {
         webviewController = nullptr;
@@ -143,10 +151,18 @@ private:
     /// <returns>json representation of webview2 cookie as string</returns>
     std::wstring cookieToString(ICoreWebView2Cookie* cookie);
 
+    std::wstring responseToJsonString(
+        ICoreWebView2WebResourceResponseView* response, IStream* content);
+
+    std::wstring getResponseContent(IStream* content, bool& readAll);
+
+    std::wstring responseHeadersToJsonString(ICoreWebView2HttpResponseHeaders* responseHeaders);
+
     /// <summary>
     /// Converts back webview from string
     /// </summary>
     /// <param name="json">json string to convert to cookie object</param>
     /// <returns>parsed cookie</returns>
-    void loadCookies();
+    /// <returns>true if cookies has been loaded successfully</returns>
+    bool loadCookies();
 };
