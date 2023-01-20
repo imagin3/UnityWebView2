@@ -25,6 +25,11 @@ class MyWebview {
     std::wstring cookiesDataPath;
 
     /// <summary>
+    /// url for auth detection, retrieve response content and parse result
+    /// </summary>
+    std::wstring authUrl;
+
+    /// <summary>
     /// Display rect of webview
     /// </summary>
     RECT bounds;
@@ -38,6 +43,7 @@ class MyWebview {
     EventCallBack navigationCompletedCallbackInstance = nullptr;
     EventRegistrationToken navigationCompletedCallbackToken;
     EventCallBack receiveResponseCallbackInstance = nullptr;
+    EventRegistrationToken webResponseRquestedCallbackToken;
     EventRegistrationToken webResponseReceivedCallbackToken;
 
     EventCallBack cookieRetrievedCallbackInstance = nullptr;
@@ -105,6 +111,12 @@ public:
     void runJavascript(LPCWSTR js, JSCallBack cb);
 
     /// <summary>
+    /// Set auth url to be able to get content of response if needed
+    /// </summary>
+    /// <param name="url"></param>
+    void setAuthUrl(LPCWSTR url);
+
+    /// <summary>
     /// Get cookies depending given url
     /// </summary>
     /// <param name="url">url to retrieve cookies about</param>
@@ -129,11 +141,12 @@ public:
     /// <param name="cb"></param>
     void registerResponseReceivedCallback(EventCallBack cb);
 
-private:
     ~MyWebview() {
         webviewController = nullptr;
         webviewWindow = nullptr;
     }
+
+private:
     std::wstring boolToString(BOOL value);
     std::wstring encodeQuote(std::wstring raw);
 
@@ -152,9 +165,9 @@ private:
     std::wstring cookieToString(ICoreWebView2Cookie* cookie);
 
     std::wstring responseToJsonString(
-        ICoreWebView2WebResourceResponseView* response, IStream* content);
+        ICoreWebView2WebResourceResponseView* response, std::wstring url, IStream* content);
 
-    std::wstring getResponseContent(IStream* content, bool& readAll);
+    std::wstring getResponseContent(IStream* content, int contentLength);
 
     std::wstring responseHeadersToJsonString(ICoreWebView2HttpResponseHeaders* responseHeaders);
 

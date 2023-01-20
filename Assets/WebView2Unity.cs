@@ -14,6 +14,9 @@ namespace WebView2Unity
         public Image ImageRef;
         public string InitialURL = "";
 
+        private string browserPath = null;
+        private DirectoryInfo userDataPath = null;
+
         /// <summary>
         /// Callback Event 
         /// </summary>
@@ -32,26 +35,28 @@ namespace WebView2Unity
         void Start()
         {
             // TODO : Fix Bad Memory Management
+            // Leads to freeze ....
             if (debug)
                 WebView2Native.RegisterDbgCb();
+            InitWebview();
+        }
+
+        protected virtual void InitWebview()
+        {
+            NewWebView();
             Create();
         }
 
-        public void Create()
-        {
+        protected void NewWebView() {
             try
             {
-                // Leads to freeze ....
-                // WebView2Native.RegisterDbgCb();
-
                 // TODO define 
-                DirectoryInfo userDataPath = new DirectoryInfo(Application.persistentDataPath + "/../web");
+                userDataPath = new DirectoryInfo(Application.persistentDataPath + "/../web");
                 if (!userDataPath.Exists)
                 {
                     userDataPath.Create();
                 }
-                // Don't look for local browser if already install in dev
-                string browserPath = null;
+                // Don't look for local browser if already installed in dev
 #if UNITY_EDITOR
                 bool localMachine = RegistriyKeyExists(Microsoft.Win32.Registry.LocalMachine, @"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}");
                 bool currentUser = RegistriyKeyExists(Microsoft.Win32.Registry.CurrentUser, @"Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}");
@@ -65,8 +70,8 @@ namespace WebView2Unity
 #if !UNITY_EDITOR
                         DebugEx.Write("Webview Runtime folder does not exists !");
 #else
-                    
-                        bool retRuntimeInstall = UnityEditor.EditorUtility.DisplayDialog("Runtime pour webview2 inexistant", "Le runtime pour la webview n'est pas installé, voulez-vous l'installer ?", "Oui", "Non"); 
+
+                        bool retRuntimeInstall = UnityEditor.EditorUtility.DisplayDialog("Runtime pour webview2 inexistant", "Le runtime pour la webview n'est pas installé, voulez-vous l'installer ?", "Oui", "Non");
                         if (retRuntimeInstall)
                         {
                             Application.OpenURL("https://developer.microsoft.com/fr-fr/microsoft-edge/webview2/");
@@ -78,6 +83,17 @@ namespace WebView2Unity
                 Debug.Log("new webview");
                 WebView2Native.NewWebView(gameObject.name, callbackNavigationCompleted, callbackResponseReceived);
 
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("Error creating webview" + e.Message);
+            }
+        }
+
+        protected void Create()
+        {
+            try
+            {
                 string url = InitialURL;
                 if (string.IsNullOrEmpty(url))
                     url = null;
@@ -91,7 +107,7 @@ namespace WebView2Unity
             }
         }
 
-        private void callbackResponseReceived(string message)
+        protected virtual void callbackResponseReceived(string message)
         {
             if (OnResponseReceived != null)
             {
@@ -99,7 +115,7 @@ namespace WebView2Unity
             }
         }
 
-        private void callbackNavigationCompleted(string message){
+        protected virtual void callbackNavigationCompleted(string message){
             Debug.Log("show : " + gameObject.name + " = " + message);
             //Show();
             if (OnPageLoaded != null)

@@ -41,6 +41,17 @@ void Log(LPCWSTR message, Color color, ...) {
     }
     va_end(vl);
 }
+
+
+std::wstring fromChar(std::string s) {
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    return converter.from_bytes(s);
+}
+
+std::string fromWideChar(std::wstring ws) {
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    return converter.to_bytes(ws);
+}
 //-------------------------------------------------------------------
 
 /// <summary>
@@ -125,6 +136,8 @@ PLUGIN_API void closeWebView(LPCWSTR objectName) {
     MyWebview* webView = getWebView(objectName);
     if (webView != NULL) {
         webView->closeWebView();
+        delete webviews[objectName];
+        webviews.erase(objectName);
     }
 }
 
@@ -156,6 +169,14 @@ PLUGIN_API void RunJavaScript(LPCWSTR objectName, LPCWSTR script, JSCallBack cal
     MyWebview* webView = getWebView(objectName);
     if (webView != NULL) {
         webView->runJavascript(script, callback);
+    }
+}
+
+PLUGIN_API void setAuthUrl(LPCWSTR objectName, LPCWSTR url)
+{
+    MyWebview* webView = getWebView(objectName);
+    if (webView != NULL) {
+        webView->setAuthUrl(url);
     }
 }
 

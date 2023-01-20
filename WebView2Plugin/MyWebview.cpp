@@ -4,9 +4,6 @@
 #include <WebView2EnvironmentOptions.h>
 #include <regex>
 #include "json/json.h"
-#include <locale>
-#include <codecvt>
-#include <iterator>
 
 using namespace Microsoft::WRL;
 
@@ -79,30 +76,50 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
                         Settings->put_IsScriptEnabled(TRUE);
                         Settings->put_AreDefaultScriptDialogsEnabled(TRUE);
                         Settings->put_IsWebMessageEnabled(TRUE);
+
+                        webview2_2->add_WebResourceRequested(Callback<ICoreWebView2WebResourceRequestedEventHandler>(
+                            [this](
+                                ICoreWebView2* sender,
+                                ICoreWebView2WebResourceRequestedEventArgs* args) 
+                        {
+                            wil::com_ptr<ICoreWebView2WebResourceRequest> request;
+                            args->get_Request(&request);
+                            wil::unique_cotaskmem_string uri;
+                            request->get_Uri(&uri);
+                            std::wstring curUri = uri.get();
+
+                            return S_OK; 
+                        }).Get(), &webResponseRquestedCallbackToken);
                         
                         webview2_2->add_WebResourceResponseReceived(Callback<ICoreWebView2WebResourceResponseReceivedEventHandler>(
                             [this](
                                 ICoreWebView2*,
                                 ICoreWebView2WebResourceResponseReceivedEventArgs* args) -> HRESULT 
                             {
+                                wil::com_ptr<ICoreWebView2WebResourceRequest> request;
+                                args->get_Request(&request);
+                                wil::unique_cotaskmem_string uri;
+                                request->get_Uri(&uri);
+                                std::wstring curUri = uri.get();
 
-                                wil::com_ptr<ICoreWebView2WebResourceResponseView> responseArgs;
-                                args->get_Response(&responseArgs);
-
-                                if (receiveResponseCallbackInstance != nullptr && responseArgs != nullptr)
+                                if (curUri.compare(authUrl) == 0 && receiveResponseCallbackInstance != nullptr)
                                 {
-                                    responseArgs->GetContent(Callback <ICoreWebView2WebResourceResponseViewGetContentCompletedHandler>(
-                                        [this, responseArgs](
-                                            HRESULT errorCode, 
-                                            IStream* content) -> HRESULT 
+                                    wil::com_ptr<ICoreWebView2WebResourceResponseView> responseArgs;
+                                    args->get_Response(&responseArgs);
+                                    if(responseArgs != nullptr)
+                                    {
+                                        responseArgs->GetContent(Callback <ICoreWebView2WebResourceResponseViewGetContentCompletedHandler>(
+                                            [this, responseArgs, curUri](
+                                                HRESULT errorCode,
+                                                IStream* content) -> HRESULT
                                         {
-                                            
-                                            std::wstring response = objectName + L"@" + responseToJsonString(responseArgs.get(), content);
+                                            std::wstring response = objectName + L"¤" + responseToJsonString(responseArgs.get(), curUri, content);
 
                                             receiveResponseCallbackInstance(response.c_str(), (int)response.size());
 
                                             return S_OK;
                                         }).Get());
+                                    }
                                 }
 
                                 return S_OK;
@@ -127,7 +144,7 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
 
                                 /*wchar_t szBuff[512];
                                 swprintf_s(szBuff, 512, L"%s@%s", objectName, uri.get());*/
-                                std::wstring message = objectName + L"@" + uri.get();
+                                std::wstring message = objectName + L"¤" + uri.get();
                                 navigationCompletedCallbackInstance(message.c_str(), (int)message.size());
                             }
                             return S_OK;
@@ -250,6 +267,10 @@ void MyWebview::runJavascript(LPCWSTR js, JSCallBack cb) {
     }
 }
 
+void MyWebview::setAuthUrl(LPCWSTR url) {
+    authUrl = url;
+}
+
 void MyWebview::getCookies(LPCWSTR url, EventCallBack callback) {
     if (cookieManager != nullptr)
     {
@@ -263,7 +284,7 @@ void MyWebview::getCookies(LPCWSTR url, EventCallBack callback) {
 
             if (cookieRetrievedCallbackInstance != nullptr)
             {
-                cookies = objectName + L"@" + cookies;
+                cookies = objectName + L"¤" + cookies;
                 cookieRetrievedCallbackInstance(cookies.c_str(), (int)cookies.size());
             }
 
@@ -436,7 +457,7 @@ bool MyWebview::loadCookies()
 }
 
 std::wstring MyWebview::responseToJsonString(
-    ICoreWebView2WebResourceResponseView* response, IStream* content)
+    ICoreWebView2WebResourceResponseView* response, std::wstring url, IStream* content)
 {
     wil::com_ptr<ICoreWebView2HttpResponseHeaders> headers;
     response->get_Headers(&headers);
@@ -448,15 +469,26 @@ std::wstring MyWebview::responseToJsonString(
     headers->Contains(L"Content-Type", &containsContentType);
     wil::unique_cotaskmem_string contentType;
     bool isBinaryContent = true;
+    std::regex e();
+    wil::unique_cotaskmem_string contentLengthHeader;
     if (containsContentType)
     {
         headers->GetHeader(L"Content-Type", &contentType);
-        if (wcsncmp(L"text/", contentType.get(), ARRAYSIZE(L"text/")) == 0)
+        if (std::regex_match<wchar_t>(contentType.get(), std::wregex(L"(application\/json|text\/|application\/xml|application/xhtml\+xml).*")))
         {
             isBinaryContent = false;
         }
+        BOOL containsLength = FALSE;
+        headers->Contains(L"Content-Length", &containsLength);
+        if (containsLength)
+        {
+            headers->GetHeader(L"Content-Length", &contentLengthHeader);
+        }
+        else contentLengthHeader = nullptr;
     }
     std::wstring result = L"{";
+
+    result += L"\"url\": " + encodeQuote(url) + L", ";
 
     result += L"\"content\": ";
     if (!content)
@@ -471,13 +503,10 @@ std::wstring MyWebview::responseToJsonString(
         }
         else
         {
-            bool readAll = false;
+            
+            int contentLength = _wtoi(contentLengthHeader.get());
             // TODO : parse all data
-            result += encodeQuote(getResponseContent(content, readAll));
-            if (!readAll)
-            {
-                result += L"...";
-            }
+            result += encodeQuote(getResponseContent(content, contentLength));
         }
     }
     result += L", ";
@@ -496,16 +525,26 @@ std::wstring MyWebview::responseToJsonString(
 }
 
 
-std::wstring MyWebview::getResponseContent(IStream* content, bool& readAll)
+std::wstring MyWebview::getResponseContent(IStream* content, int contentLength = -1)
 {
-    char buffer[50];
-    unsigned long read;
-    content->Read(buffer, 50U, &read);
-    readAll = read < 50;
-
-    WCHAR converted[50];
-    MultiByteToWideChar(CP_UTF8, MB_PRECOMPOSED, buffer, 50, converted, 50);
-    return std::wstring(converted);
+    std::string stringbuffer = "";
+    bool hasLength = contentLength != -1;
+    contentLength = hasLength ? contentLength : 150;
+    char* buffer = new char[contentLength];
+    unsigned long read = 0;
+    bool continueReading = true;
+    while (continueReading)
+    {
+        HRESULT readResult = content->Read(buffer, contentLength, &read);
+        if ((hasLength && readResult == S_OK) || readResult == S_FALSE)
+        {
+            continueReading = false;
+            buffer[read] = '\0';
+        }
+        stringbuffer += std::string(buffer);
+    }
+    
+    return fromChar(stringbuffer);
 }
 
 std::wstring MyWebview::responseHeadersToJsonString(ICoreWebView2HttpResponseHeaders* responseHeaders)

@@ -35,6 +35,8 @@ namespace WebView2Unity
         [DllImport(PLUGIN, CharSet = CharSet.Unicode)]
         static extern void RunJavaScript(string objectName, string script, JSCallBack callback);
         [DllImport(PLUGIN, CharSet = CharSet.Unicode)]
+        static extern void setAuthUrl(string objectName, string url);
+        [DllImport(PLUGIN, CharSet = CharSet.Unicode)]
         static extern void getCookies(string objectName, string url, EventCallBack cb = null);
         [DllImport(PLUGIN, CharSet = CharSet.Unicode)]
         static extern bool saveCookies(string objectName, string url);
@@ -81,7 +83,7 @@ namespace WebView2Unity
                 //Ptr to string
                 string msg_string = Marshal.PtrToStringUni(request, size);
 
-                string[] splittedMsg = msg_string.Split('@');
+                string[] splittedMsg = msg_string.Split('¤');
                 string objName = splittedMsg[0];
                 string message = splittedMsg.Length > 1 ? splittedMsg[1] : "";
 
@@ -96,7 +98,7 @@ namespace WebView2Unity
             if (responseCallbacks != null && responseCallbacks.Count > 0)
             {
                 string msg_string = Marshal.PtrToStringUni(message, size);
-                string[] splittedMsg = msg_string.Split('@');
+                string[] splittedMsg = msg_string.Split('¤');
                 string objName = splittedMsg[0];
                 string jsonMessage = splittedMsg.Length > 1 ? splittedMsg[1] : "";
 
@@ -131,6 +133,11 @@ namespace WebView2Unity
 #else
             return createWebView(objectName, url, startVisible, browserPath, dataPath);
 #endif
+        }
+
+        public static void SetAuthUrl(string objectName, string url)
+        {
+            setAuthUrl(objectName, url);
         }
 
         public static void Navigate(string objectName, string url)

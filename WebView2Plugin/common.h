@@ -6,6 +6,9 @@
 #include <tchar.h>
 #include <iostream>
 #include <fstream>
+#include <locale>
+#include <codecvt>
+#include <iterator>
 
 // DEBUG LOG by
 // https://github.com/programmercert/UnityNativeDebugLog
@@ -38,5 +41,8 @@ extern "C"
 enum class Color { Red, Green, Blue, Black, White, Yellow, Orange };
 
 void Log(LPCWSTR message, Color color = Color::White);
+
+std::wstring fromChar(std::string s);
+std::string fromWideChar(std::wstring ws);
 
 #endif

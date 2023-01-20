@@ -3,46 +3,90 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
 namespace WebView2Unity
 {
 
-    [RequireComponent(typeof(WebView2Unity))]
-    public class Saml2Auth : MonoBehaviour
+    public class Saml2Auth : WebView2Unity
     {
-        WebView2Unity webview;
         string targetUrl = "http://samlidp.iteca.lan/userinfos.php";
         string authUrl = "http://samlidp.iteca.lan/";
-
+        string logoutUrl = "http://samlidp.iteca.lan/?slo";
 
         Action<bool> userAuth;
 
+        bool loggedIn = false;
+
         // Start is called before the first frame update
-        void Awake()
+        protected override void InitWebview()
         {
-            if (webview == null)
-                webview = GetComponent<WebView2Unity>();
-
-            webview.InitialURL = authUrl + "?returnto=" + targetUrl;
-
-            //webview.OnPageLoaded += OnPageLoaded;
-            webview.OnResponseReceived += OnResponseReceived;
+            NewWebView();
+            SetAuthUrl();
+            Create();
         }
 
-        private void OnResponseReceived(string obj)
+        public void onAuthBtnClick()
         {
+            if (loggedIn)
+                LogOut();
+            else
+                LogIn();
+        }
 
+        public void LogIn()
+        {
+            //Navigate(InitialURL);
+            Show();
+        }
+
+        public void LogOut()
+        {
+            Navigate(logoutUrl);
+        }
+
+        protected void SetAuthUrl()
+        {
+            InitialURL = authUrl + "?returnto=" + targetUrl;
+            WebView2Native.SetAuthUrl(gameObject.name, targetUrl);
+        }
+
+        protected override void callbackResponseReceived(string message)
+        {
+            Debug.Log("response " + message);
+            string url = "";
+            try
+            {
+                JObject json = JObject.Parse(message);
+                url = (string)json["url"];
+            }
+            catch(Exception e)
+            {
+                Debug.LogError(e.Message);
+            }
+            if (url == targetUrl || url == targetUrl + "/")
+            {
+                // SamlAUth has ended
+                loggedIn = true;
+                Debug.Log("SAML AUTH ended!");
+
+            }
             //if (userAuth != null)
             //    userAuth(obj);
+            base.callbackResponseReceived(message);
         }
 
         // Update is called once per frame
-        void OnPageLoaded(string url)
+        protected override void callbackNavigationCompleted(string url)
         {
+            Debug.Log("navigated " + url);
             // SamlAUth has ended
             if (url == targetUrl || url == targetUrl + "/")
             {
-                webview.SaveCookies(url);
+                SaveCookies(url);
             }
+            base.callbackNavigationCompleted(url);
         }
     }
 }
