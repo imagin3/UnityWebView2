@@ -471,7 +471,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Connect
+  m_Text: Connexion
 --- !u!222 &562274214
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -666,13 +666,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 963194225}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 720050081dccccf49b94bf8c455a7050, type: 3}
+  m_Script: {fileID: 11500000, guid: 0c808e9ef7a47864b8dd157834829814, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   debug: 0
   ImageRef: {fileID: 0}
   InitialURL: 
   showWebview: 0
+  buttonText: {fileID: 562274211}
 --- !u!1 &1515259446
 GameObject:
   m_ObjectHideFlags: 0

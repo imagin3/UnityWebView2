@@ -5,12 +5,14 @@ using System.IO;
 using UnityEngine;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using UnityEngine.UI;
 
 namespace WebView2Unity
 {
 
     public class Saml2Auth : WebView2Unity
     {
+        [SerializeField] GameObject buttonText;
         string targetUrl = "http://samlidp.iteca.lan/userinfos.php";
         string authUrl = "http://samlidp.iteca.lan/";
         string logoutUrl = "http://samlidp.iteca.lan/?slo";
@@ -32,18 +34,22 @@ namespace WebView2Unity
             if (loggedIn)
                 LogOut();
             else
+            {
                 LogIn();
+            }
         }
 
         public void LogIn()
         {
-            //Navigate(InitialURL);
+            Navigate(InitialURL);
             Show();
         }
 
         public void LogOut()
         {
             Navigate(logoutUrl);
+            loggedIn = false;
+            buttonText.GetComponent<Text>().text = "Connexion";
         }
 
         protected void SetAuthUrl()
@@ -69,11 +75,14 @@ namespace WebView2Unity
             {
                 // SamlAUth has ended
                 loggedIn = true;
-                Debug.Log("SAML AUTH ended!");
+
+                if (buttonText != null)
+                {
+                    buttonText.GetComponent<Text>().text = "Logout";
+                }
+                Hide();
 
             }
-            //if (userAuth != null)
-            //    userAuth(obj);
             base.callbackResponseReceived(message);
         }
 
