@@ -10,16 +10,15 @@ void RegisterDebugCallback(FuncCallBack cb) {
     dbgCallbackInstance = cb;
 }
 
-static std::map<LPCWSTR, MyWebview*> webviews;
-static std::map<LPCWSTR, MyWebview*>::iterator webviewsIt;
+static std::vector<MyWebview*> webviews;
 
 MyWebview* getWebView(LPCWSTR objectName) {
     if (webviews.size() > 0)
     {
-        for (std::map<LPCWSTR, MyWebview*>::iterator it = webviews.begin(); it != webviews.end(); ++it)
+        for (std::vector<MyWebview*>::iterator it = webviews.begin(); it != webviews.end(); ++it)
         {
-            if (wcscmp(objectName, it->first) == 0)
-                return it->second;
+            if ((*it)->isBoundToObjectWithName(objectName))
+                return (*it);
         }
     }
     return NULL;
@@ -71,9 +70,8 @@ void RegisterNavigationCompletedCallback(LPCWSTR objectName, EventCallBack navDo
 PLUGIN_API int newWebView(LPCWSTR objectName, EventCallBack navCb = nullptr, EventCallBack responseReceivedCb = nullptr) {
     if (getWebView(objectName) == NULL)
     {
-        Log(L"create new webview named : ");
-        Log(objectName);
-        webviews[objectName] = new MyWebview(objectName, navCb, responseReceivedCb);
+        LPCWSTR webviewName = objectName;
+        webviews.push_back(new MyWebview(webviewName, navCb, responseReceivedCb));
         //webviews.insert(std::pair<LPCWSTR, MyWebview*>(objectName, webview));
 
         return 0;
@@ -95,10 +93,6 @@ PLUGIN_API int createWebView(LPCWSTR objectName, LPCWSTR url, bool startVisible 
         wchar_t szbuf[256];
         swprintf_s(szbuf, 256, L"Webview not available over %d : ", nbWebview);
         Log(szbuf);
-        for (std::map<LPCWSTR, MyWebview*>::iterator it = webviews.begin(); it != webviews.end(); ++it)
-        {
-            Log(it->first);
-        }
     }
     return -1;
 }
@@ -133,11 +127,21 @@ PLUGIN_API void updateWebViewBound(LPCWSTR objectName, int x, int y, int width, 
 }
 
 PLUGIN_API void closeWebView(LPCWSTR objectName) {
-    MyWebview* webView = getWebView(objectName);
-    if (webView != NULL) {
-        webView->closeWebView();
-        delete webviews[objectName];
-        webviews.erase(objectName);
+    if (webviews.size() > 0)
+    {
+        webviews.erase(
+            std::remove_if(
+                webviews.begin(),
+                webviews.end(),
+                [objectName](MyWebview* const& w) { if (w->isBoundToObjectWithName(objectName)) {
+                        w->closeWebView();
+                        return true;
+                    }
+                    return false;
+                }
+            ),
+            webviews.end()
+        );
     }
 }
 
@@ -192,4 +196,5 @@ PLUGIN_API bool saveCookies(LPCWSTR objectName, LPCWSTR url) {
     if (webView != NULL) {
         return webView->saveCookies(url);
     }
+    return false;
 }

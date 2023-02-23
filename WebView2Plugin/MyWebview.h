@@ -52,6 +52,8 @@ class MyWebview {
 public:
     MyWebview(LPCWSTR objectName, EventCallBack navigationEvent, EventCallBack responseReceivedEvent);
 
+    bool isBoundToObjectWithName(LPCWSTR _objectName) { return wcscmp(_objectName, objectName.c_str()) == 0; }
+
     /// <summary>
     /// Call webview and environment creation of webview
     /// </summary>

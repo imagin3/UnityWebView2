@@ -64,6 +64,17 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
                         if (webview2_2 != nullptr)
                             webview2_2->get_CookieManager(&cookieManager);
 
+                        /*wil::com_ptr<ICoreWebView2Profile> webView2Profile;
+                        auto webView7 = webviewWindow.try_query<ICoreWebView2_13>();
+                        webView7->get_Profile(&webView2Profile);
+                        auto webView2Profile2 = webView2Profile.try_query<ICoreWebView2Profile2>();
+                        webView2Profile2->ClearBrowsingData(COREWEBVIEW2_BROWSING_DATA_KINDS::COREWEBVIEW2_BROWSING_DATA_KINDS_ALL_SITE, 
+                            Callback<ICoreWebView2ClearBrowsingDataCompletedHandler>(
+                                    [this](HRESULT error) -> HRESULT {
+                                return S_OK;
+                            })
+                            .Get());*/
+
                         if (cookieManager != nullptr)
                         {
                             loadCookies();
@@ -90,6 +101,8 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
 
                             return S_OK; 
                         }).Get(), &webResponseRquestedCallbackToken);
+
+                        
                         
                         webview2_2->add_WebResourceResponseReceived(Callback<ICoreWebView2WebResourceResponseReceivedEventHandler>(
                             [this](
@@ -211,6 +224,8 @@ void MyWebview::closeWebView()
     if (webviewController != nullptr)
     {
         webviewController->Close();
+        navigationCompletedCallbackInstance = nullptr;
+        receiveResponseCallbackInstance = nullptr;
         webviewController = nullptr;
         webviewWindow = nullptr;
     }
@@ -503,10 +518,15 @@ std::wstring MyWebview::responseToJsonString(
         }
         else
         {
-            
-            int contentLength = _wtoi(contentLengthHeader.get());
-            // TODO : parse all data
-            result += encodeQuote(getResponseContent(content, contentLength));
+            STATSTG stat;
+            HRESULT hrRet = content->Stat(&stat, STATFLAG_NONAME);
+            if (hrRet == S_OK)
+            {
+                // _wtoi(contentLengthHeader.get()); contentLength from header can differs from real body length
+                int contentLength = stat.cbSize.QuadPart;
+                // TODO : parse all data
+                result += getResponseContent(content, contentLength);
+            }
         }
     }
     result += L", ";
