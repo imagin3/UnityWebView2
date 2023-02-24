@@ -198,3 +198,10 @@ PLUGIN_API bool saveCookies(LPCWSTR objectName, LPCWSTR url) {
     }
     return false;
 }
+
+PLUGIN_API void clearCache(LPCWSTR objectName) {
+    MyWebview* webView = getWebView(objectName);
+    if (webView != NULL) {
+        webView->clearCache();
+    }
+}

@@ -5,7 +5,8 @@
 #include <string>
 #include <tchar.h>
 #include <wil/com.h>
-
+#include <mutex>
+#include <condition_variable>
 #include "common.h"
 
 class MyWebview {
@@ -48,6 +49,9 @@ class MyWebview {
 
     EventCallBack cookieRetrievedCallbackInstance = nullptr;
 
+    bool navigationCompleted = false;
+    std::mutex navigationMutex;
+    std::condition_variable navigationCV;
 
 public:
     MyWebview(LPCWSTR objectName, EventCallBack navigationEvent, EventCallBack responseReceivedEvent);
@@ -70,11 +74,17 @@ public:
     /// </summary>
     /// <param name="url">url to navigate to</param>
     void navigate(LPCWSTR url);
+
     /// <summary>
     /// Displays html given in htmlContent parameter
     /// </summary>
     /// <param name="htmlContent">html to displays</param>
     void navigateToHTML(LPCWSTR htmlContent);
+
+    /// <summary>
+    /// Reload current page
+    /// </summary>
+    void reload();
 
     /// <summary>
     /// Close this webview
@@ -142,6 +152,11 @@ public:
     /// </summary>
     /// <param name="cb"></param>
     void registerResponseReceivedCallback(EventCallBack cb);
+
+    /// <summary>
+    /// Clear cache depending on site and data kind
+    /// </summary>
+    void clearCache();
 
     ~MyWebview() {
         webviewController = nullptr;

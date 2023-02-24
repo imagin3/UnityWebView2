@@ -64,22 +64,12 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
                         if (webview2_2 != nullptr)
                             webview2_2->get_CookieManager(&cookieManager);
 
-                        /*wil::com_ptr<ICoreWebView2Profile> webView2Profile;
-                        auto webView7 = webviewWindow.try_query<ICoreWebView2_13>();
-                        webView7->get_Profile(&webView2Profile);
-                        auto webView2Profile2 = webView2Profile.try_query<ICoreWebView2Profile2>();
-                        webView2Profile2->ClearBrowsingData(COREWEBVIEW2_BROWSING_DATA_KINDS::COREWEBVIEW2_BROWSING_DATA_KINDS_ALL_SITE, 
-                            Callback<ICoreWebView2ClearBrowsingDataCompletedHandler>(
-                                    [this](HRESULT error) -> HRESULT {
-                                return S_OK;
-                            })
-                            .Get());*/
-
                         if (cookieManager != nullptr)
                         {
                             loadCookies();
                         }
                         //! [CookieManager]
+                        //! 
 
                         // WebViewの設定
                         ICoreWebView2Settings* Settings;
@@ -99,10 +89,28 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
                             request->get_Uri(&uri);
                             std::wstring curUri = uri.get();
 
+                            if (curUri.compare(authUrl) == 0 && receiveResponseCallbackInstance != nullptr)
+                            {
+
+                                wil::com_ptr<ICoreWebView2WebResourceResponse> responseArgs;
+                                args->get_Response(&responseArgs);
+                                if (responseArgs != nullptr)
+                                {
+                                    wil::com_ptr<IStream> requestContent;
+                                    HRESULT contentResult = responseArgs->get_Content(&requestContent);
+                                }
+                            }
+
                             return S_OK; 
                         }).Get(), &webResponseRquestedCallbackToken);
 
-                        
+                        webview2_2->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>(
+                            [this](ICoreWebView2*, ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT {
+                                //std::lock_guard<std::mutex> lock(navigationMutex);
+                                navigationCompleted = false;
+                                //navigationCV.notify_one();
+                                return S_OK;
+                            }).Get(), NULL);
                         
                         webview2_2->add_WebResourceResponseReceived(Callback<ICoreWebView2WebResourceResponseReceivedEventHandler>(
                             [this](
@@ -114,14 +122,26 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
                                 wil::unique_cotaskmem_string uri;
                                 request->get_Uri(&uri);
                                 std::wstring curUri = uri.get();
+                                wil::com_ptr<IStream> requestContent;
+                                request->get_Content(&requestContent);
 
                                 if (curUri.compare(authUrl) == 0 && receiveResponseCallbackInstance != nullptr)
                                 {
+                                    
                                     wil::com_ptr<ICoreWebView2WebResourceResponseView> responseArgs;
                                     args->get_Response(&responseArgs);
                                     if(responseArgs != nullptr)
                                     {
-                                        responseArgs->GetContent(Callback <ICoreWebView2WebResourceResponseViewGetContentCompletedHandler>(
+                                        while (!navigationCompleted)
+                                        {
+                                            MSG message;
+                                            while (GetMessage(&message, NULL, 0, 0)) {
+                                                TranslateMessage(&message);
+                                                DispatchMessage(&message);
+                                            }
+                                        }
+
+                                        HRESULT contentResult = responseArgs->GetContent(Callback <ICoreWebView2WebResourceResponseViewGetContentCompletedHandler>(
                                             [this, responseArgs, curUri](
                                                 HRESULT errorCode,
                                                 IStream* content) -> HRESULT
@@ -129,12 +149,11 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
                                             std::wstring response = objectName + L"¤" + responseToJsonString(responseArgs.get(), curUri, content);
 
                                             receiveResponseCallbackInstance(response.c_str(), (int)response.size());
-
+                                            
                                             return S_OK;
                                         }).Get());
                                     }
                                 }
-
                                 return S_OK;
 
                             }).Get(), &webResponseReceivedCallbackToken);
@@ -145,6 +164,9 @@ int MyWebview::create(LPCWSTR url, bool startVisible, LPCWSTR browserPath, LPCWS
                             ICoreWebView2*,
                             ICoreWebView2NavigationCompletedEventArgs* args) -> HRESULT
                         {
+                            std::unique_lock<std::mutex> lock(navigationMutex);
+                            navigationCompleted = true;
+                            navigationCV.notify_all();
                             if (navigationCompletedCallbackInstance != nullptr)
                             {
                                 wil::unique_cotaskmem_string uri;
@@ -216,6 +238,13 @@ void MyWebview::navigateToHTML(LPCWSTR htmlContent)
     if (webviewWindow != nullptr)
     {
         webviewWindow->NavigateToString(htmlContent);
+    }
+}
+
+void MyWebview::reload() {
+    if (webviewWindow != nullptr)
+    {
+        webviewWindow->Reload();
     }
 }
 
@@ -591,4 +620,22 @@ std::wstring MyWebview::responseHeadersToJsonString(ICoreWebView2HttpResponseHea
     }
 
     return result + L"]";
+}
+
+void MyWebview::clearCache() {
+    auto webview2_13 = webviewWindow.try_query<ICoreWebView2_13>();
+    if (webview2_13)
+    {
+        wil::com_ptr<ICoreWebView2Profile> profile = nullptr;
+        webview2_13->get_Profile(&profile);
+        if (profile != nullptr)
+        {
+            wil::com_ptr<ICoreWebView2Profile2> profile2 = nullptr;
+            profile2 = profile.try_query<ICoreWebView2Profile2>();
+            if (profile2 != nullptr)
+            {
+                profile2->ClearBrowsingDataAll(nullptr);
+            }
+        }
+    }
 }
